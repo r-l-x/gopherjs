@@ -195,9 +195,11 @@ func ImportDir(dir string, mode build.ImportMode, installSuffix string, buildTag
 // The native packages are augmented by the contents of natives.FS in the following way.
 // The file names do not matter except the usual `_test` suffix. The files for
 // native overrides get added to the package (even if they have the same name
-// as an existing file from the standard library). For all identifiers that exist
-// in the original AND the overrides, the original identifier in the AST gets
-// replaced by `_`. New identifiers that don't exist in original package get added.
+// as an existing file from the standard library). For function identifiers that exist
+// in the original AND the overrides, the original identifier in the AST gets prefixed by
+// `_gopherjs_overridden_`. For other identifiers (e.g. variables) that exist in the
+// original AND the overrides, the original identifier gets replaced by `_`.
+// New identifiers that don't exist in original package get added.
 func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([]*ast.File, error) {
 	var files []*ast.File
 	replacedDeclNames := make(map[string]bool)
@@ -341,8 +343,10 @@ func parseAndAugment(pkg *build.Package, isTest bool, fileSet *token.FileSet) ([
 		for _, decl := range file.Decls {
 			switch d := decl.(type) {
 			case *ast.FuncDecl:
+				// Allow overridden function calls
+				// The standard library implementation of foo() becomes _gopherjs_overridden_foo()
 				if replacedDeclNames[funcName(d)] {
-					d.Name = ast.NewIdent("_")
+					d.Name.Name = "_gopherjs_overridden_" + d.Name.Name
 				}
 			case *ast.GenDecl:
 				switch d.Tok {
